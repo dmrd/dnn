@@ -1,0 +1,37 @@
+import matplotlib.pyplot as plt
+from matplotlib import animation
+import numpy as np
+
+
+class Sampler:
+    pass
+
+
+def animate2d(sampler):
+    return animation.FuncAnimation(plt.figure(), sampler)
+
+
+def reshape_image(im, dim=None):
+    if dim is None:
+        dim = (-1, int(im.size**(0.5) + 0.5))
+    return np.reshape(im, dim)
+
+
+def show_image(im, dim=None):
+    plt.imshow(reshape_image(im, dim), interpolation='nearest', cmap=plt.gray())
+
+
+def plot_filters(W, filter_dim, grid_dim, space=5):
+    rows, cols = grid_dim
+    height, width = filter_dim
+    height += space
+    width += space
+    result = np.zeros((rows * height, cols * width))
+    for y in range(rows):
+        for x in range(cols):
+            im = reshape_image(W[y*cols + x], filter_dim)
+            # Normalize image to [0, 1] to maintain same intensity throughout grid
+            im -= im.min()
+            im /= im.max()
+            result[y * height:(y+1)*height - space, x * width: (x+1)*width - space] = im
+    plt.imshow(result, interpolation='nearest', cmap=plt.gray())

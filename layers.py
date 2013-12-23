@@ -10,22 +10,35 @@ def draw_bernoulli(m):
     return np.random.rand(*m.shape) < m
 
 
-class Layer:
-    def __init__(self):
-        pass
+class Layer(object):
+    def __init__(self, size):
+        self.size = size
+        self.bias = np.zeros(size)
 
     def expectation(self, activations):
-        pass
+        raise NotImplementedError("No expectation method defined")
 
     def sample(self, activations):
-        pass
+        raise NotImplementedError("No sampling method defined")
+
+    def gradient(self, positive, negative):
+        return positive.sum(axis=0) - negative.sum(axis=0)
+
+    def gradient_update(self, update):
+        self.bias += update
+
+    def __repr__(self):
+        return str(self.bias)
+
+    def __getitem__(self, key):
+        return self.bias[key]
 
 
-def BinaryLayer(Layer):
+class BinaryLayer(Layer):
     def expectation(self, activations):
-        return sigmoid(activations)
+        return sigmoid(activations + self.bias)
 
-    def sample_activations(self, activations):
+    def sample(self, activations):
         return draw_bernoulli(self.expectation(activations))
 
     def sample_exp(self, exp):

@@ -25,12 +25,18 @@ class Connection:
     def gradient_update(self, update):
         self.W += update
 
+    def __repr__(self):
+        return str(self.W)
+
+    def __getitem__(self, key):
+        return self.W[key]
+
 
 class FullConnection(Connection):
     def __init__(self, dim_bottom, dim_top):
         self.dim_b = dim_bottom
         self.dim_t = dim_top
-        self.W = np.zeros(dim_top, dim_bottom)
+        self.W = 0.1 * np.random.randn(dim_top, dim_bottom)
 
     def prop_up(self, bottom):
         return np.dot(bottom, self.W.T)
@@ -50,7 +56,7 @@ class ShapeBMConnection(Connection):
         self.dim_b = dim_bottom
         self.dim_t = dim_top
         self.patches = patches
-        self.W = np.zeros(dim_top / len(patches), dim_bottom)
+        self.W = np.zeros((dim_top / len(patches), dim_bottom))
 
     def prop_up(self, bottom):
         raw = np.zeros(bottom.shape[0], self.dim_t)
