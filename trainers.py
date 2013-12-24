@@ -7,6 +7,7 @@ def initialize_states(model, data):
     for connection in model.connections[:-1]:
         layers.append(connection.prop_up(layers[-1] * 2))
     layers.append(model.connections[-1].prop_up(layers[-1]))
+    return layers
 
 
 # Data dependent statistics

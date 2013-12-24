@@ -21,17 +21,17 @@ def show_image(im, dim=None):
     plt.imshow(reshape_image(im, dim), interpolation='nearest', cmap=plt.gray())
 
 
-def plot_filters(W, filter_dim, grid_dim, space=5):
+def plot_images(images, image_dim, grid_dim, space=5):
     rows, cols = grid_dim
-    height, width = filter_dim
+    height, width = image_dim
     height += space
     width += space
     result = np.zeros((rows * height, cols * width))
     for y in range(rows):
         for x in range(cols):
-            im = reshape_image(W[y*cols + x], filter_dim)
+            im = reshape_image(images[y*cols + x], image_dim)
             # Normalize image to [0, 1] to maintain same intensity throughout grid
-            im -= im.min()
-            im /= im.max()
-            result[y * height:(y+1)*height - space, x * width: (x+1)*width - space] = im
+            normalized = (im - im.min())
+            normalized /= (normalized.max() or 1.0)
+            result[y * height:(y+1)*height - space, x * width: (x+1)*width - space] = normalized
     plt.imshow(result, interpolation='nearest', cmap=plt.gray())

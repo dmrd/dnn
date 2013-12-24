@@ -31,7 +31,7 @@ class Model(object):
     def sample(self, index, states):
         return self.layers[index].sample(self.activation(index, states))
 
-    def train(self, lr, epoch, batch_size, data):
+    def train(self, lr, epoch, batch_size, data, checkpoint=None):
         data = np.reshape(data, (-1, self.layers[0].size))  # Ensure input is 2d array
         nbatches = int(np.ceil(data.shape[0] / float(batch_size)))
         for e in range(epoch):
@@ -55,24 +55,30 @@ class Model(object):
                     gradient = layer.gradient(dd[i], md[i])
                     gradient = lr * (gradient / examples)
                     layer.gradient_update(gradient)
-
                 err += np.sum((v_pos - md[0]) ** 2)
-            print("Epoch {}: {}".format(e+1, err))
+            if checkpoint is not None and ((e + 1) % checkpoint) == 0:
+                print("Epoch {}: {}".format(e+1, np.sqrt(err / data.size)))
 
     def dream(self, data, steps=1):
+        """
+        Generator that returns samples separated by #steps
+        Returns probabilities
+        """
         data = np.reshape(data, (-1, self.connections[0].dim_b))  # Ensure input is 2d array
         states = trainers.initialize_states(self, data)
 
-        for s in range(steps):
-            # Up to hidden
-            for i in range(1, len(self.layers)):
-                states[i] = self.sample(i, states)
+        while True:
+            for s in range(steps):
+                # Up to hidden
+                for i in range(1, len(self.layers)):
+                    states[i] = self.sample(i, states)
 
-            # Back down to visible
-            for i in range(len(self.layers), -1, -1):
-                states[i] = self.sample(i, states)
-
-        return states[0]
+                # Back down to visible
+                for i in range(len(self.layers)-1, 0, -1):
+                    states[i] = self.sample(i, states)
+                visible = self.expectation(0, states)
+                states[0] = self.layers[0].sample_exp(visible)
+            yield visible
 
 
 class BinaryRBM(Model):
