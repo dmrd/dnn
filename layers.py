@@ -11,9 +11,13 @@ def draw_bernoulli(m):
 
 
 class Layer(object):
-    def __init__(self, size):
+    def __init__(self, size, initial_bias=None):
         self.size = size
-        self.bias = np.zeros(size)
+        if initial_bias is not None:
+            assert(initial_bias.size == size)
+            self.bias = initial_bias
+        else:
+            self.bias = np.zeros(size)
 
     def expectation(self, activations):
         raise NotImplementedError("No expectation method defined")

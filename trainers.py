@@ -3,11 +3,13 @@ def initialize_states(model, data):
     Initialize states for a deep boltzmann machine given data.
     Double weights up to account for lack of top down input
     """
-    layers = [data]
-    for connection in model.connections[:-1]:
-        layers.append(connection.prop_up(layers[-1] * 2))
-    layers.append(model.connections[-1].prop_up(layers[-1]))
-    return layers
+    states = [data]
+    for i, connection in enumerate(model.connections[:-1]):
+        states.append(model.layers[i + 1].expectation(connection.prop_up(states[-1] * 2)))
+
+    # Last layer has only input from below, so no doubling
+    states.append(model.layers[-1].expectation(model.connections[-1].prop_up(states[-1])))
+    return states
 
 
 # Data dependent statistics
@@ -62,34 +64,62 @@ class CD_model:
 
     def __call__(self, model, data, stats):
         assert(len(model.connections) == 1)  # Only use for RBMs
-        h_pos_states = model.layers[1].sample_exp(stats['data'][1])
-        v_neg_prob = model.expectation(0, [None, h_pos_states])
-        v_neg_states = model.layers[0].sample_exp(v_neg_prob)
-        h_neg_prob = model.expectation(1, [v_neg_states, None])
+        h_states = model.layers[1].sample_exp(stats['data'][1])
+        for i in range(self.steps):
+            v_neg_prob, v_states = model.sample(0, [None, h_states])
+            h_neg_prob, h_states = model.sample(1, [v_states, None])
 
         stats['model'] = [v_neg_prob, h_neg_prob]
+        stats['reconstruction'] = v_neg_prob
 
 
 class PCD_model:
-    def __init__(self, steps=5):
-        self.steps = 5
+    def __init__(self, steps=1):
+        self.steps = steps
         self.chains = None
 
     def __call__(self, model, data, stats):
         # Chains correspond to states from last round
-        if self.chains is None:
-            self.chains = [data]
-            for connection in model.connections[:-1]:
-                self.chains.append(connection.prop_up(self.chains[-1] * 2))
-            self.chains.append(model.connections[-1].prop_up(self.chains[-1]))
 
-        for step in range(self.steps):
+        if self.chains is None:
+            self.chains = initialize_states(model, data)
+
+        for step in range(self.steps - 1):
             # Sample even layers
             for layer in range(0, len(self.chains), 2):
-                self.chains[layer] = model.sample(layer, self.chains)
+                _, self.chains[layer] = model.sample(layer, self.chains)
 
             # Sample odd layers
             for layer in range(1, len(self.chains), 2):
-                self.chains[layer] = model.sample(layer, self.chains)
+                _, self.chains[layer] = model.sample(layer, self.chains)
 
-        stats['model'] = self.chains
+        # Save expectations in last step to return
+        result = [None] * len(model.layers)
+        for layer in range(0, len(self.chains), 2):
+            result[layer], self.chains[layer] = model.sample(layer, self.chains)
+        for layer in range(1, len(self.chains), 2):
+            result[layer], self.chains[layer] = model.sample(layer, self.chains)
+
+        stats['model'] = result
+
+
+# Learning rate schedules
+def lr_constant(lr, epoch, epochs):
+    return lr
+
+
+def lr_linear(lr, epoch, epochs):
+    return lr * (1.0 - (epoch / float(epochs)))
+
+
+def lr_slow_start(lr, epoch, epochs):
+    lr_kink1 = epochs/10
+    lr_kink2 = epochs/5
+
+     #Adjust learning rate between epochs
+    if epoch < lr_kink1:
+        return lr * epoch/lr_kink1/10
+    elif epoch < lr_kink2:
+        ledge = lr/10
+        return ledge + (lr - ledge) * (epoch-lr_kink1)/(lr_kink2-lr_kink1)
+    return lr

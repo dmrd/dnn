@@ -19,9 +19,10 @@ def reshape_image(im, dim=None):
 
 def show_image(im, dim=None):
     plt.imshow(reshape_image(im, dim), interpolation='nearest', cmap=plt.gray())
+    plt.show()
 
 
-def plot_images(images, image_dim, grid_dim, space=5):
+def plot_images(images, image_dim, grid_dim, space=5, size=None):
     rows, cols = grid_dim
     height, width = image_dim
     height += space
@@ -35,3 +36,17 @@ def plot_images(images, image_dim, grid_dim, space=5):
             normalized /= (normalized.max() or 1.0)
             result[y * height:(y+1)*height - space, x * width: (x+1)*width - space] = normalized
     plt.imshow(result, interpolation='nearest', cmap=plt.gray())
+    f = plt.gcf()
+    if size:
+        f.set_size_inches(size[0], size[1])
+    plt.axis('off')
+    plt.show()
+
+
+def mean_activations(rbm, data):
+    expectations = rbm.expectation(1, [data, None])
+    average = expectations.mean(axis=0)
+
+    plt.imshow(np.reshape(average, (-1, 25)),
+               interpolation="nearest", cmap=plt.gray())
+    plt.show()
