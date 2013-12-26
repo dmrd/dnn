@@ -2,6 +2,7 @@ import numpy as np
 import layers
 import connections
 import trainers
+import utils
 import time
 
 
@@ -107,7 +108,7 @@ class BinaryRBM(Model):
 
 class ShapeRBM(Model):
     def __init__(self, num_v, num_h, patches, model_stat=None, data=None,
-                 v_damping=0.3, w_init=0.1):
+                 v_damping=0.3, w_init=0.1, double_up=False, double_down=False):
         if data is not None:
             mean_v = v_damping + (1-2*v_damping)*np.mean(data, axis=0)
             bias_v = np.log(mean_v / (1.0 - mean_v))
@@ -115,7 +116,8 @@ class ShapeRBM(Model):
         else:
             l1 = layers.BinaryLayer(num_v)
         l2 = layers.BinaryLayer(num_h)
-        c1 = connections.ShapeBMConnection(num_v, num_h, patches, w_init=w_init)
+        c1 = connections.ShapeBMConnection(num_v, num_h, patches, w_init=w_init,
+                                           double_down=double_down, double_up=double_up)
         if model_stat is None:
             model_stat = trainers.PCD_model()
         stats = [trainers.CD_data(), model_stat]
@@ -123,15 +125,52 @@ class ShapeRBM(Model):
 
 
 class ShapeBM(Model):
-    def __init__(self, num_v, num_h1, num_h2, patches, trainers):
+    def __init__(self, num_v, num_h1, num_h2, patches):
+        self.patches = patches
         blayers = [layers.BinaryLayer(s) for s in [num_v, num_h1, num_h2]]
         c1 = connections.ShapeBMConnection(num_v, num_h1, patches)
         c2 = connections.FullConnection(num_h1, num_h2)
-        stats = [trainers.CD_data(), trainers.PCD_model()]
+        stats = [trainers.MF_data(), trainers.PCD_model()]
         Model.__init__(self, blayers, [c1, c2], stats)
 
+    def pretrain(self, data,
+                 epoch=[3000, 3000],
+                 v_damping=[0.3, 1e-10],
+                 w_init=[0.01, 0.1],
+                 lr=[0.001, 0.002],
+                 batch_size=64,
+                 lr_schedule=trainers.lr_slow_start,
+                 rbml1=None, rbml2=None,
+                 rbml1_path=None, rbml2_path=None,
+                 checkpoint=None):
+        if rbml1 is None:
+            rbml1 = ShapeRBM(self.num_v, self.num_h1, self.patches,
+                             model_stat=trainers.CD_model(),
+                             data=data,
+                             v_damping=v_damping[0],
+                             w_init=w_init[0],
+                             double_up=True)
+            rbml1.train(lr=lr[0], epoch=epoch[0], batch_size=batch_size,
+                        lr_schedule=lr_schedule, checkpoint=checkpoint)
+            if rbml1_path:
+                utils.save_model(rbml1, rbml1_path)
+        if rbml2 is None:
+            data_l2 = rbml1.expectation(1, data)
+            rbml2 = BinaryRBM(self.num_h1, self.num_h2,
+                              model_stat=trainers.CD_model(),
+                              data=data_l2,
+                              v_damping=v_damping[1],
+                              w_init=w_init[1],
+                              double_down=True)
+            rbml2.train(lr=lr[1], epoch=epoch[1], batch_size=batch_size,
+                        lr_schedule=lr_schedule, checkpoint=checkpoint)
+            if rbml2_path:
+                utils.save_model(rbml2, rbml2_path)
 
-class DBM(Model):
-    def __init__(self, num_v, num_h1, num_h2):
-        stats = [trainers.MF_data(), trainers.PCD_model()]
-        pass
+        # Combine parameters to full dbm
+        self.connections[0].W = rbml1.connections[0].W.copy()
+        self.connections[1].W = rbml2.connections[0].W.copy()
+        self.layers[0].bias = rbml1.layers[0].bias.copy()
+        self.layers[1].bias = rbml1.layers[1].bias + rbml2.layers[0].bias
+        self.layers[2].bias = rbml2.layers[1].bias.copy()
+        return
