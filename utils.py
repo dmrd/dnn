@@ -1,3 +1,5 @@
+import os
+import pickle
 import numpy as np
 
 
@@ -37,3 +39,17 @@ def create_patches(num_v, patches, dimensions, overlap):
     # Check that all patches have same number of on units
     assert(all(x.size == final[0].size for x in final))
     return np.asanyarray(final)
+
+
+def save_model(m, name):
+    # Save as .model file if no extension specified
+    if not os.path.splitext(name)[1]:
+        name += ".model"
+    with open(name, 'wb') as f:
+        pickle.dump(m, f)
+
+
+def load_model(name):
+    if os.path.isfile(name):
+        return pickle.load(open(name, "rb"))
+    return None
