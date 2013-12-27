@@ -13,6 +13,7 @@ class Model(object):
             assert(connections[i].dim_t == connections[i + 1].dim_b)
         self.connections = connections
         self.statistics = statistics
+        self.err = []
 
     def activation(self, index, states):
         """
@@ -35,9 +36,8 @@ class Model(object):
         exp = self.expectation(index, states)
         return exp, self.layers[index].sample_exp(exp)
 
-    def train(self, lr, epoch, batch_size, data, lr_schedule=trainers.lr_constant, checkpoint=None):
+    def train(self, lr, epoch, batch_size, data, lr_schedule=trainers.lr_linear, checkpoint=None):
         data = np.reshape(data, (-1, self.layers[0].size))  # Ensure input is 2d array
-
         nbatches = int(np.ceil(data.shape[0] / float(batch_size)))
         start = time.time()
         for e in range(epoch):
@@ -67,21 +67,27 @@ class Model(object):
                         stats['reconstruction'] = self.reconstruct(v_pos)
                     err += np.sum((v_pos - stats['reconstruction']) ** 2)
             if checkpoint is not None and ((e + 1) % checkpoint) == 0:
+                err = np.sqrt(err / data.size)
+                self.err.append(err)
                 print("Epoch {}: {} | {}".format(e+1,
                                                  time.time() - start,
-                                                 np.sqrt(err / data.size)))
+                                                 err))
                 start = time.time()
 
     def reconstruct(self, data):
         return self.dream(data).next()
 
-    def dream(self, data, steps=1):
+    def dream(self, data, steps=1, known_mask=None, known_values=None):
         """
         Generator that returns samples separated by #steps
         Returns probabilities
         """
         data = np.reshape(data, (-1, self.connections[0].dim_b))  # Ensure input is 2d array
         states = trainers.initialize_states(self, data)
+
+        if known_mask is not None and known_values is not None:
+            known_mask = np.reshape(known_mask, (1, self.connections[0].dim_b))
+            known_values = np.reshape(known_values, (1, self.connections[0].dim_b))
 
         while True:
             for s in range(steps):
@@ -92,6 +98,11 @@ class Model(object):
                 # Back down to visible
                 for i in range(len(self.layers)-1, -1, -1):
                     exp, states[i] = self.sample(i, states)
+
+                # Mask visible layer with known values
+                if known_mask is not None:
+                    exp[:, known_mask] = known_values[known_mask]
+                    states[0][:, known_mask] = known_values[known_mask]
             yield exp
 
 
@@ -126,11 +137,14 @@ class ShapeRBM(Model):
 
 class ShapeBM(Model):
     def __init__(self, num_v, num_h1, num_h2, patches):
+        self.num_v = num_v
+        self.num_h1 = num_h1
+        self.num_h2 = num_h2
         self.patches = patches
         blayers = [layers.BinaryLayer(s) for s in [num_v, num_h1, num_h2]]
         c1 = connections.ShapeBMConnection(num_v, num_h1, patches)
         c2 = connections.FullConnection(num_h1, num_h2)
-        stats = [trainers.MF_data(), trainers.PCD_model()]
+        stats = [trainers.MF_data(10), trainers.PCD_model(5)]
         Model.__init__(self, blayers, [c1, c2], stats)
 
     def pretrain(self, data,
@@ -151,21 +165,27 @@ class ShapeBM(Model):
                              w_init=w_init[0],
                              double_up=True)
             rbml1.train(lr=lr[0], epoch=epoch[0], batch_size=batch_size,
-                        lr_schedule=lr_schedule, checkpoint=checkpoint)
+                        data=data, lr_schedule=lr_schedule,
+                        checkpoint=checkpoint)
             if rbml1_path:
                 utils.save_model(rbml1, rbml1_path)
+        self.rbml1 = rbml1
+
         if rbml2 is None:
-            data_l2 = rbml1.expectation(1, data)
-            rbml2 = BinaryRBM(self.num_h1, self.num_h2,
-                              model_stat=trainers.CD_model(),
-                              data=data_l2,
-                              v_damping=v_damping[1],
-                              w_init=w_init[1],
-                              double_down=True)
+            data_l2 = rbml1.expectation(1, [data, None])
+            rbml2 = ShapeRBM(self.num_h1, self.num_h2,
+                             patches=[slice(None, None, None)],
+                             model_stat=trainers.CD_model(),
+                             data=data_l2,
+                             v_damping=v_damping[1],
+                             w_init=w_init[1],
+                             double_down=True)
             rbml2.train(lr=lr[1], epoch=epoch[1], batch_size=batch_size,
-                        lr_schedule=lr_schedule, checkpoint=checkpoint)
+                        data=data_l2, lr_schedule=lr_schedule,
+                        checkpoint=checkpoint)
             if rbml2_path:
                 utils.save_model(rbml2, rbml2_path)
+        self.rbml2 = rbml2
 
         # Combine parameters to full dbm
         self.connections[0].W = rbml1.connections[0].W.copy()
