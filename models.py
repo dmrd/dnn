@@ -94,6 +94,7 @@ class Model(object):
         data = np.reshape(data, (-1, self.connections[0].dim_b))  # Ensure input is 2d array
         states = trainers.initialize_states(self, data)
 
+        # Ensure known values are proper dimensions
         if known_mask is not None and known_values is not None:
             known_mask = np.reshape(known_mask, (1, self.connections[0].dim_b))
             known_values = np.reshape(known_values, (1, self.connections[0].dim_b))
@@ -115,20 +116,25 @@ class Model(object):
             yield exp
 
 
+###############################
+# Templates for common models #
+###############################
+
 class BinaryRBM(Model):
-    def __init__(self, num_v, num_h, model_stat=None):
+    def __init__(self, num_v, num_h, model_stat=None, ordered_trainers=None):
         l1 = layers.BinaryLayer(num_v)
         l2 = layers.BinaryLayer(num_h)
         c1 = connections.FullConnection(num_v, num_h)
         if model_stat is None:
             model_stat = trainers.CD_model()
         stats = [trainers.CD_data(), model_stat]
-        Model.__init__(self, [l1, l2], [c1], stats)
+        Model.__init__(self, [l1, l2], [c1], stats, ordered_trainers)
 
 
 class ShapeRBM(Model):
     def __init__(self, num_v, num_h, patches, model_stat=None, data=None,
-                 v_damping=0.3, w_init=0.1, double_up=False, double_down=False):
+                 v_damping=0.3, w_init=0.1, double_up=False, double_down=False,
+                 ordered_trainers=None):
         if data is not None:
             mean_v = v_damping + (1-2*v_damping)*np.mean(data, axis=0)
             bias_v = np.log(mean_v / (1.0 - mean_v))
@@ -141,11 +147,49 @@ class ShapeRBM(Model):
         if model_stat is None:
             model_stat = trainers.PCD_model()
         stats = [trainers.CD_data(), model_stat]
-        Model.__init__(self, [l1, l2], [c1], stats)
+        Model.__init__(self, [l1, l2], [c1], stats, ordered_trainers)
+
+
+class DBM3(Model):
+    """ Three layer DBM model """
+    def __init__(self, num_v, num_h1, num_h2,
+                 c1_type=None, c1_args=None,
+                 c2_type=None, c2_args=None,
+                 layer_type=layers.BinaryLayer,
+                 MF_steps=10, PCD_steps=5,
+                 ordered_trainers=None):
+        self.num_v = num_v
+        self.num_h1 = num_h1
+        self.num_h2 = num_h2
+        blayers = [layer_type(s) for s in [num_v, num_h1, num_h2]]
+        c1 = c1_type(num_v, num_h1, *c1_args)
+        c2 = c2_type(num_h1, num_h2, *c2_args)
+        stats = [trainers.MF_data(MF_steps), trainers.PCD_model(PCD_steps)]
+        Model.__init__(self, blayers, [c1, c2], stats, ordered_trainers)
+
+    def stack_rbm(self, rbml1, rbml2):
+        """ Combine parameters to into full dbm """
+        # Check all of the dimensions
+        assert(rbml1.connections[0].num_b == self.connections[0].num_b)
+        assert(rbml1.connections[0].num_t == self.connections[0].num_t)
+        assert(rbml2.connections[0].num_b == self.connections[1].num_b)
+        assert(rbml2.connections[0].num_t == self.connections[1].num_t)
+        assert(rbml1.layers[0].size == self.layers[0].size)
+        assert(rbml1.layers[1].size == self.layers[1].size)
+        assert(rbml2.layers[0].size == self.layers[1].size)
+        assert(rbml2.layers[0].size == self.layers[2].size)
+        self.connections[0].W = rbml1.connections[0].W.copy()
+        self.connections[1].W = rbml2.connections[0].W.copy()
+        self.layers[0].bias = rbml1.layers[0].bias.copy()
+        self.layers[1].bias = rbml1.layers[1].bias + rbml2.layers[0].bias
+        self.layers[2].bias = rbml2.layers[1].bias.copy()
+
+    def pretrain(self):
+        pass
 
 
 class ShapeBM(Model):
-    def __init__(self, num_v, num_h1, num_h2, patches):
+    def __init__(self, num_v, num_h1, num_h2, patches, ordered_trainers=None):
         self.num_v = num_v
         self.num_h1 = num_h1
         self.num_h2 = num_h2
@@ -154,7 +198,7 @@ class ShapeBM(Model):
         c1 = connections.ShapeBMConnection(num_v, num_h1, patches)
         c2 = connections.FullConnection(num_h1, num_h2)
         stats = [trainers.MF_data(10), trainers.PCD_model(5)]
-        Model.__init__(self, blayers, [c1, c2], stats)
+        Model.__init__(self, blayers, [c1, c2], stats, ordered_trainers)
 
     def pretrain(self, data,
                  epoch=[3000, 3000],
