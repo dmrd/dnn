@@ -60,7 +60,7 @@ class CD_model:
         Use expectation for final step
     """
     def __init__(self, steps=1):
-        self.steps = 1
+        self.steps = steps
 
     def __call__(self, model, data, stats):
         assert(len(model.connections) == 1)  # Only use for RBMs
@@ -123,3 +123,46 @@ def lr_slow_start(lr, epoch, epochs):
         ledge = lr/10
         return ledge + (lr - ledge) * (epoch-lr_kink1)/(lr_kink2-lr_kink1)
     return lr
+
+
+class Trainer(object):
+    def __init__(self):
+        pass
+
+    def get_update(self, model, stats, i, learning_rate, epoch, **kwargs):
+        raise NotImplemented("No update method defined")
+
+    def update_state(self, model, i, update):
+        pass
+
+
+class Gradient(Trainer):
+    def get_update(self, model, stats, i, learning_rate, epoch):
+        dd = stats['data']  # Data dependent
+        md = stats['model']  # Model dependent
+        return learning_rate * model.connections[i].gradient(dd[i], dd[i+1], md[i], md[i+1])
+
+
+class WeightDecay(Trainer):
+    def __init__(self, strength):
+        self.strength = strength
+
+    def get_update(self, model, stats, i, *args):
+        return -self.strength * model.connections[i].W
+
+
+class Momentum(Trainer):
+    def __init__(self, strength):
+        self.strength = strength
+        self.last = [None]
+
+    def get_update(self, model, stats, i, *args):
+        while len(self.last) < i:
+            self.last.append(None)
+        if self.last[i] is None:
+            return 0
+        return self.strength * self.last[i]
+
+    def update_state(self, model, i, update):
+        self.last[i] = update
+        return

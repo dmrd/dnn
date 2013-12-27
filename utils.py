@@ -2,7 +2,6 @@ import os
 import pickle
 import numpy as np
 
-
 def create_patches(num_v, patches, dimensions, overlap):
     """
     patches: (x, y, z) tuple of # patches to split each dimension into

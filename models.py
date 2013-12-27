@@ -7,13 +7,15 @@ import time
 
 
 class Model(object):
-    def __init__(self, layers, connections, statistics):
+    def __init__(self, layers, connections, statistics, ordered_trainers=None):
         self.layers = layers
         for i in range(len(connections) - 1):
             assert(connections[i].dim_t == connections[i + 1].dim_b)
         self.connections = connections
         self.statistics = statistics
-        self.err = []
+        # Default to basic gradient trainer alone
+        self.trainers = ordered_trainers or [trainers.Gradient()]
+        self.err = []  # Track rmse across training
 
     def activation(self, index, states):
         """
@@ -50,22 +52,29 @@ class Model(object):
                 for statistic in self.statistics:
                     statistic(self, v_pos, stats)
 
-                dd = stats['data']  # Data dependent
-                md = stats['model']  # Model dependent
                 examples = v_pos.shape[0]
+                batch_lr = epoch_lr / examples
                 for i, connection in enumerate(self.connections):
-                    gradient = connection.gradient(dd[i], dd[i+1], md[i], md[i+1])
-                    gradient = epoch_lr * (gradient / examples)
+                    # Get first update
+                    gradient = self.trainers[0].get_update(self, stats, i, batch_lr, e)
+                    for trainer in self.trainers[1:]:  # Run any additional updates (momentum etc.)
+                        gradient += trainer.get_update(self, stats, i, batch_lr, e)
+                    for trainer in self.trainers:
+                        trainer.update_state(self, i, gradient)
                     connection.gradient_update(gradient)
 
+                dd = stats['data']  # Data dependent
+                md = stats['model']  # Model dependent
                 for i, layer in enumerate(self.layers):
                     gradient = layer.gradient(dd[i], md[i])
-                    gradient = epoch_lr * (gradient / examples)
+                    gradient = batch_lr * gradient
                     layer.gradient_update(gradient)
+
                 if checkpoint is not None and ((e + 1) % checkpoint) == 0:
                     if 'reconstruction' not in stats:
                         stats['reconstruction'] = self.reconstruct(v_pos)
                     err += np.sum((v_pos - stats['reconstruction']) ** 2)
+
             if checkpoint is not None and ((e + 1) % checkpoint) == 0:
                 err = np.sqrt(err / data.size)
                 self.err.append(err)
