@@ -147,8 +147,8 @@ class WeightDecay(Trainer):
     def __init__(self, strength):
         self.strength = strength
 
-    def get_update(self, model, stats, i, *args):
-        return -self.strength * model.connections[i].W
+    def get_update(self, model, stats, i, learning_rate, *args):
+        return -self.strength * learning_rate * model.connections[i].W
 
 
 class Momentum(Trainer):
@@ -157,7 +157,7 @@ class Momentum(Trainer):
         self.last = [None]
 
     def get_update(self, model, stats, i, *args):
-        while len(self.last) < i:
+        while len(self.last) <= i:
             self.last.append(None)
         if self.last[i] is None:
             return 0

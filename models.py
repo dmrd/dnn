@@ -13,8 +13,8 @@ class Model(object):
             assert(connections[i].dim_t == connections[i + 1].dim_b)
         self.connections = connections
         self.statistics = statistics
-        # Default to basic gradient trainer alone
-        self.trainers = ordered_trainers or [trainers.Gradient()]
+        # Always start with basic gradient trainer alone
+        self.trainers = [trainers.Gradient()] + (ordered_trainers or list())
         self.err = []  # Track rmse across training
 
     def activation(self, index, states):
@@ -41,7 +41,8 @@ class Model(object):
     def train(self, lr, epoch, batch_size, data, lr_schedule=trainers.lr_linear, checkpoint=None):
         data = np.reshape(data, (-1, self.layers[0].size))  # Ensure input is 2d array
         nbatches = int(np.ceil(data.shape[0] / float(batch_size)))
-        start = time.time()
+        begin_time = time.time()
+        start = begin_time  # Used to log time since last checkpoint
         for e in range(epoch):
             np.random.shuffle(data)
             err = 0.0
@@ -82,6 +83,7 @@ class Model(object):
                                                  time.time() - start,
                                                  err))
                 start = time.time()
+        print("Total time: {}".format(time.time() - begin_time))
 
     def reconstruct(self, data):
         return self.dream(data).next()
@@ -151,7 +153,7 @@ class ShapeRBM(Model):
 
 
 class DBM3(Model):
-    """ Three layer DBM model """
+    """ Three layer DBM model - TODO"""
     def __init__(self, num_v, num_h1, num_h2,
                  c1_type=None, c1_args=None,
                  c2_type=None, c2_args=None,
@@ -169,7 +171,7 @@ class DBM3(Model):
 
     def stack_rbm(self, rbml1, rbml2):
         """ Combine parameters to into full dbm """
-        # Check all of the dimensions
+        # Check that all of the dimensions match up
         assert(rbml1.connections[0].num_b == self.connections[0].num_b)
         assert(rbml1.connections[0].num_t == self.connections[0].num_t)
         assert(rbml2.connections[0].num_b == self.connections[1].num_b)
@@ -183,9 +185,6 @@ class DBM3(Model):
         self.layers[0].bias = rbml1.layers[0].bias.copy()
         self.layers[1].bias = rbml1.layers[1].bias + rbml2.layers[0].bias
         self.layers[2].bias = rbml2.layers[1].bias.copy()
-
-    def pretrain(self):
-        pass
 
 
 class ShapeBM(Model):
