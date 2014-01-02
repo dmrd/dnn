@@ -28,9 +28,10 @@ def mnist():
 
     # Load the dataset
     f = gzip.open(filename, 'rb')
-    #train_set, valid_set, test_set = cPickle.load(f)
-    train_set, _, _ = cPickle.load(f)
+    train_set, valid_set, test_set = cPickle.load(f)
     f.close()
+
+    # Only using training set (50,000 examples) for now
     return train_set[0]
 
 
