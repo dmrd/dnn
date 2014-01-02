@@ -8,7 +8,7 @@ This is my second implementation because I realized the generally modular archit
 
 Overall architecture is to have different kinds of **layers** (binary, gaussian, etc.) and **connections**
 between them that handle propagating activations.  For now these are fully
-connected and [http://arkitus.com/ShapeBM/](ShapeBM) style connection, but there is no reason it wouldn't work for convolutions as well.  I tried to make it easy to add different kinds of model statistics and update methods, but the specific methods are still fairly purpose built.  The only training method right now is minibatch stochastic gradient descent.
+connected and [ShapeBM](http://arkitus.com/ShapeBM/) style connection, but there is no reason it wouldn't work for convolutions as well.  I tried to make it easy to add different kinds of model statistics and update methods, but the specific methods are still fairly purpose built.  The only training method right now is minibatch stochastic gradient descent.
 
 Each model is made up of a list of layers, list of connections, and any statistics that should be run (generally at least a data dependent and model dependent statistic).
 
@@ -24,4 +24,4 @@ Usage
 ======
 
 Basic usage and examples are illustrated in the ipython notebook
-[http://nbviewer.ipython.org/github/dmrd/dnn/blob/master/demo.ipynb](demo.ipynb).
+[demo.ipynb](http://nbviewer.ipython.org/github/dmrd/dnn/blob/master/demo.ipynb)
