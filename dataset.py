@@ -1,13 +1,33 @@
 import cPickle
 import gzip
 import os
+from urllib2 import urlopen, URLError, HTTPError
 import numpy as np
 import Image
 
 
+def download_file(url, filename):
+    try:
+        f = urlopen(url)
+        with open(filename, 'wb') as target:
+            data = f.readlines()
+            target.writelines(data)
+    except HTTPError, e:
+        print "HTTP Error:", e.code, url
+    except URLError, e:
+        print "URL Error:", e.reason, url
+
+
 def mnist():
+    """ Load the pickled MNIST file from deeplearning.net """
+    filename = './data/mnist.pkl.gz'
+    if not os.path.isfile(filename):
+        url = 'http://deeplearning.net/data/mnist/mnist.pkl.gz (16MB)...'
+        print("Downloading mnist dataset from {}".format(url))
+        download_file(url, filename)
+
     # Load the dataset
-    f = gzip.open('./data/mnist.pkl.gz', 'rb')
+    f = gzip.open(filename, 'rb')
     #train_set, valid_set, test_set = cPickle.load(f)
     train_set, _, _ = cPickle.load(f)
     f.close()
