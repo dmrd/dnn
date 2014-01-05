@@ -43,10 +43,10 @@ def plot_images(images, image_dim, grid_dim, space=5, size=None):
     plt.show()
 
 
-def mean_activations(rbm, data):
+def mean_activations(rbm, data, size):
     expectations = rbm.expectation(1, [data, None])
     average = expectations.mean(axis=0)
 
-    plt.imshow(np.reshape(average, (-1, 25)),
+    plt.imshow(np.reshape(average, size),
                interpolation="nearest", cmap=plt.gray())
     plt.show()

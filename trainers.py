@@ -143,7 +143,15 @@ class Gradient(Trainer):
         return learning_rate * model.connections[i].gradient(dd[i], dd[i+1], md[i], md[i+1])
 
 
-class WeightDecay(Trainer):
+class L1WeightDecay(Trainer):
+    def __init__(self, strength):
+        self.strength = strength
+
+    def get_update(self, model, stats, i, learning_rate, *args):
+        return -self.strength * np.sign(model.connections[i].W)
+
+
+class L2WeightDecay(Trainer):
     def __init__(self, strength):
         self.strength = strength
 
