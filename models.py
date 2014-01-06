@@ -1,4 +1,5 @@
 import numpy as np
+import gnumpy as gp
 import layers
 import connections
 import trainers
@@ -39,12 +40,13 @@ class Model(object):
         return exp, self.layers[index].sample_exp(exp)
 
     def train(self, lr, epoch, batch_size, data, lr_schedule=trainers.lr_linear, checkpoint=None):
-        data = np.reshape(data, (-1, self.layers[0].size))  # Ensure input is 2d array
+        data = data.reshape((-1, self.layers[0].size))  # Ensure input is 2d array
         nbatches = int(np.ceil(data.shape[0] / float(batch_size)))
         begin_time = time.time()
         start = begin_time  # Used to log time since last checkpoint
         for e in range(epoch):
             np.random.shuffle(data)
+            data = gp.as_garray(data)  # Move back to garray instance
             err = 0.0
             epoch_lr = lr_schedule(lr, e, epoch)  # Get lr for current epoch
             for batch in range(nbatches):
@@ -74,7 +76,7 @@ class Model(object):
                 if checkpoint is not None and ((e + 1) % checkpoint) == 0:
                     if 'reconstruction' not in stats:
                         stats['reconstruction'] = self.reconstruct(v_pos)
-                    err += np.sum((v_pos - stats['reconstruction']) ** 2)
+                    err += gp.sum((v_pos - stats['reconstruction']) ** 2)
 
             if checkpoint is not None and ((e + 1) % checkpoint) == 0:
                 err = np.sqrt(err / data.size)
@@ -93,13 +95,14 @@ class Model(object):
         Generator that returns samples separated by #steps
         Returns probabilities
         """
-        data = np.reshape(data, (-1, self.connections[0].dim_b))  # Ensure input is 2d array
+        data = data.reshape((-1, self.connections[0].dim_b))  # Ensure input is 2d array
+
         states = trainers.initialize_states(self, data)
 
         # Ensure known values are proper dimensions
         if known_mask is not None and known_values is not None:
-            known_mask = np.reshape(known_mask, (1, self.connections[0].dim_b))
-            known_values = np.reshape(known_values, (1, self.connections[0].dim_b))
+            known_mask = gp.reshape(known_mask, (1, self.connections[0].dim_b))
+            known_values = gp.reshape(known_values, (1, self.connections[0].dim_b))
 
         while True:
             for s in range(steps):
@@ -138,8 +141,8 @@ class ShapeRBM(Model):
                  v_damping=0.3, w_init=0.1, double_up=False, double_down=False,
                  ordered_trainers=None):
         if data is not None:
-            mean_v = v_damping + (1-2*v_damping)*np.mean(data, axis=0)
-            bias_v = np.log(mean_v / (1.0 - mean_v))
+            mean_v = v_damping + (1-2*v_damping)*gp.mean(data, axis=0)
+            bias_v = gp.log(mean_v / (1.0 - mean_v))
             l1 = layers.BinaryLayer(num_v, initial_bias=bias_v)
         else:
             l1 = layers.BinaryLayer(num_v)

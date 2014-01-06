@@ -1,3 +1,6 @@
+import gnumpy as gp
+
+
 def initialize_states(model, data):
     """
     Initialize states for a deep boltzmann machine given data.
@@ -148,7 +151,7 @@ class L1WeightDecay(Trainer):
         self.strength = strength
 
     def get_update(self, model, stats, i, learning_rate, *args):
-        return -self.strength * np.sign(model.connections[i].W)
+        return -self.strength * gp.sign(model.connections[i].W)
 
 
 class L2WeightDecay(Trainer):

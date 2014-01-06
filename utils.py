@@ -1,6 +1,8 @@
 import os
 import pickle
 import numpy as np
+import gnumpy as gp
+
 
 def create_patches(num_v, patches, dimensions, overlap):
     """
@@ -37,7 +39,7 @@ def create_patches(num_v, patches, dimensions, overlap):
                     final.append(np.where(patch.flatten())[0])
     # Check that all patches have same number of on units
     assert(all(x.size == final[0].size for x in final))
-    return np.asanyarray(final)
+    return gp.as_garray(final)
 
 
 def save_model(m, name):

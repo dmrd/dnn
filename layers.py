@@ -1,13 +1,9 @@
-import numpy as np
-
-
-def sigmoid(eta):
-    return 1. / (1. + np.exp(-eta))
+import gnumpy as gp
 
 
 def draw_bernoulli(m):
     """ Returns array A of same shape as m with A[x] = True with probability m[x] """
-    return np.random.rand(*m.shape) < m
+    return gp.rand(*m.shape) < m
 
 
 class Layer(object):
@@ -17,7 +13,7 @@ class Layer(object):
             assert(initial_bias.size == size)
             self.bias = initial_bias
         else:
-            self.bias = np.zeros(size)
+            self.bias = gp.zeros(size)
 
     def expectation(self, activations):
         raise NotImplementedError("No expectation method defined")
@@ -40,7 +36,7 @@ class Layer(object):
 
 class BinaryLayer(Layer):
     def expectation(self, activations):
-        return sigmoid(activations + self.bias)
+        return (activations + self.bias).sigmoid()
 
     def sample(self, activations):
         return draw_bernoulli(self.expectation(activations))
