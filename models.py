@@ -40,13 +40,15 @@ class Model(object):
         return exp, self.layers[index].sample_exp(exp)
 
     def train(self, lr, epoch, batch_size, data, lr_schedule=trainers.lr_linear, checkpoint=None):
-        data = data.reshape((-1, self.layers[0].size))  # Ensure input is 2d array
+        orig_data = data.reshape((-1, self.layers[0].size))  # Ensure input is 2d array
         nbatches = int(np.ceil(data.shape[0] / float(batch_size)))
         begin_time = time.time()
         start = begin_time  # Used to log time since last checkpoint
         for e in range(epoch):
-            np.random.shuffle(data)
-            data = gp.as_garray(data)  # Move back to garray instance
+            # Shuffle on CPU and move over to GPU
+            np.random.shuffle(orig_data)
+            data = gp.as_garray(orig_data)
+
             err = 0.0
             epoch_lr = lr_schedule(lr, e, epoch)  # Get lr for current epoch
             for batch in range(nbatches):
